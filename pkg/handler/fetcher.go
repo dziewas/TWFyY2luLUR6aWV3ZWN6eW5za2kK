@@ -114,7 +114,7 @@ func fetchUrl(url string) string {
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Printf("fetching url '%s' failed: %s", url, err)
+		log.Printf("fetching url '%s' failed: %s", url, err.Error())
 		return ""
 	}
 	defer util.MustClose(res.Body)
@@ -180,11 +180,13 @@ func (f *Fetcher) Create(w http.ResponseWriter, r *http.Request) {
 
 	defer util.MustClose(r.Body)
 
-	_, err = f.storage.Create(r.Context(), &task)
+	id, err := f.storage.Create(r.Context(), &task)
 	if err != nil {
 		util.EmitHttpError(w, err)
 		return
 	}
+
+	w.Header().Add("Location", strconv.Itoa(id))
 }
 
 func (f *Fetcher) Delete(w http.ResponseWriter, r *http.Request) {

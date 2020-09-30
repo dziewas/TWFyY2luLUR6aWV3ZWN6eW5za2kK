@@ -1,19 +1,27 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net"
 	"net/http"
+	"os"
+
+	"github.com/go-redis/redis/v8"
+
+	"crawler/pkg/store"
 
 	"github.com/gorilla/mux"
 
 	"crawler/pkg/handler"
 	"crawler/pkg/store/memory"
+	redis_db "crawler/pkg/store/redis"
 )
 
 const (
 	defaultLimit = 1024 * 1024
+	redisEnvVar  = "REDIS_URL"
 )
 
 func main() {
@@ -25,7 +33,26 @@ func main() {
 	flag.IntVar(&limit, "limit", defaultLimit, "payload limit")
 	flag.Parse()
 
-	storage := memory.NewMemory()
+	var storage store.Store
+
+	redisUrl := os.Getenv(redisEnvVar)
+	if len(redisUrl) == 0 {
+		log.Printf("'%s' env var not set, using in-mem Store\n", redisEnvVar)
+		storage = memory.NewMemory()
+	} else {
+		opts, err := redis.ParseURL(redisUrl)
+		if err != nil {
+			log.Fatalf("parsing redis url failed: %s\n", err)
+		}
+
+		rdb := redis.NewClient(opts)
+
+		log.Println("redis ping...")
+		pong, err := rdb.Ping(context.Background()).Result()
+		log.Println(pong, err)
+
+		storage = redis_db.NewStore(rdb)
+	}
 
 	fetcher := handler.NewFetcher(storage)
 	fetcherStop := fetcher.Start()
