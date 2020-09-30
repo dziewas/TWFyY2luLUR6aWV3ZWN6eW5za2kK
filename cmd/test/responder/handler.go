@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"io"
 	"log"
@@ -10,22 +11,19 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type Responder struct {
-	source    io.Reader
-	converter io.ReadWriter
+type Responder struct{}
+
+func NewResponder() *Responder {
+	return &Responder{}
 }
 
-func NewResponder(source io.Reader, converter io.ReadWriter) *Responder {
-	return &Responder{source: source, converter: converter}
-}
-
-func (r *Responder) sendChunk(w http.ResponseWriter, chunk int64) error {
-	_, err := io.CopyN(r.converter, r.source, chunk)
+func (r *Responder) sendChunk(sink http.ResponseWriter, converter io.ReadWriter, source io.Reader, chunk int64) error {
+	_, err := io.CopyN(converter, source, chunk)
 	if err != nil {
 		return err
 	}
 
-	_, err = io.CopyN(w, r.converter, chunk)
+	_, err = io.CopyN(sink, converter, chunk)
 	if err != nil {
 		return err
 	}
@@ -56,8 +54,11 @@ func (r *Responder) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		chunk = size
 	}
 
+	randomSource := rand.Reader
+	converter := NewConverter(toAlphaNumLower)
+
 	for i := int64(0); i < size/chunk; i++ {
-		err := r.sendChunk(w, chunk)
+		err := r.sendChunk(w, converter, randomSource, chunk)
 		if err != nil {
 			log.Printf("sending chunk failed: %s\n", err)
 		}
@@ -65,9 +66,14 @@ func (r *Responder) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	chunk = size % chunk
 	if chunk > 0 {
-		err := r.sendChunk(w, chunk)
+		err := r.sendChunk(w, converter, randomSource, chunk)
 		if err != nil {
 			log.Printf("sending chunk failed: %s\n", err)
 		}
 	}
+}
+
+func toAlphaNumLower(b byte) byte {
+	const alphabetSize = 'z' - 'a'
+	return 'a' + b%alphabetSize
 }

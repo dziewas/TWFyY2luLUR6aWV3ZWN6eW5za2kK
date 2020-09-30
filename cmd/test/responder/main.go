@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"flag"
 	"log"
 	"net"
@@ -17,11 +16,6 @@ const (
 	rangePath    = "/range/{" + sizeParam + "}"
 )
 
-func toAlphaNumLower(b byte) byte {
-	const alphabetSize = 'z' - 'a'
-	return 'a' + b%alphabetSize
-}
-
 func main() {
 	var port string
 
@@ -30,9 +24,7 @@ func main() {
 
 	r := mux.NewRouter()
 
-	randomSource := rand.Reader
-	converter := NewConverter(toAlphaNumLower)
-	responder := NewResponder(randomSource, converter)
+	responder := NewResponder()
 
 	r.Handle(rangePath, responder)
 
