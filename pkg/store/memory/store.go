@@ -107,7 +107,7 @@ func (m *Memory) AddAttempt(ctx context.Context, id int, a *model.Attempt) error
 	return nil
 }
 
-func (m *Memory) GetAttempts(ctx context.Context, id int) ([]*model.Attempt, error) {
+func (m *Memory) ListAttempts(ctx context.Context, id int) ([]*model.Attempt, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

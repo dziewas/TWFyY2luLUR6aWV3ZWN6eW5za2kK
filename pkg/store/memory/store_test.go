@@ -156,11 +156,11 @@ func TestGetAttempts(t *testing.T) {
 	err = store.AddAttempt(ctx, task2.Id, attempt2)
 	require.NoError(t, err)
 
-	task1Attempts, err := store.GetAttempts(ctx, task1.Id)
+	task1Attempts, err := store.ListAttempts(ctx, task1.Id)
 	require.NoError(t, err)
 	assert.Equal(t, []*model.Attempt{attempt1, attempt2}, task1Attempts)
 
-	task2Attempts, err := store.GetAttempts(ctx, task2.Id)
+	task2Attempts, err := store.ListAttempts(ctx, task2.Id)
 	require.NoError(t, err)
 	assert.Equal(t, []*model.Attempt{attempt2}, task2Attempts)
 }

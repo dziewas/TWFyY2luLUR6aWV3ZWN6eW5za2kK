@@ -12,5 +12,5 @@ type Store interface {
 	Delete(ctx context.Context, id int) error
 	ListTasks(ctx context.Context) ([]*model.Task, error)
 	AddAttempt(ctx context.Context, id int, attempt *model.Attempt) error
-	GetAttempts(ctx context.Context, id int) ([]*model.Attempt, error)
+	ListAttempts(ctx context.Context, id int) ([]*model.Attempt, error)
 }

@@ -191,7 +191,7 @@ func (s *Store) AddAttempt(ctx context.Context, id int, a *model.Attempt) error 
 	return nil
 }
 
-func (s *Store) GetAttempts(ctx context.Context, id int) ([]*model.Attempt, error) {
+func (s *Store) ListAttempts(ctx context.Context, id int) ([]*model.Attempt, error) {
 	if !s.taskExists(ctx, id) {
 		return nil, util.ErrResourceNotFound
 	}

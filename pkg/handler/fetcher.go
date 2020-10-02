@@ -46,7 +46,7 @@ func (f *Fetcher) getTasks(ctx context.Context) []*model.Task {
 
 	var dueTasks []*model.Task
 	for i, task := range tasks {
-		attempts, err := f.storage.GetAttempts(ctx, task.Id)
+		attempts, err := f.storage.ListAttempts(ctx, task.Id)
 		if err != nil {
 			log.Printf("retrieving history for task %d from DB failed: %s", task.Id, err)
 			continue
@@ -242,7 +242,7 @@ func (f *Fetcher) History(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	attempts, err := f.storage.GetAttempts(r.Context(), id)
+	attempts, err := f.storage.ListAttempts(r.Context(), id)
 	if err != nil {
 		util.EmitHttpError(w, err)
 		return
