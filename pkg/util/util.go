@@ -1,18 +1,25 @@
 package util
 
 import (
+	rand_strong "crypto/rand"
 	"io"
 	"log"
-	"math/rand"
+	"math/big"
+	rand_weak "math/rand"
 	"time"
 )
 
-func inti() {
-	rand.Seed(time.Now().UnixNano())
-}
+const maxID = 1000000
 
 func NewID() int {
-	return rand.Int()
+	id, err := rand_strong.Int(rand_strong.Reader, big.NewInt(maxID))
+	if err != nil {
+		log.Printf("random generator failed, fallback to default generator")
+
+		return rand_weak.Intn(maxID)
+	}
+
+	return int(id.Int64())
 }
 
 func MustClose(c io.Closer) {
