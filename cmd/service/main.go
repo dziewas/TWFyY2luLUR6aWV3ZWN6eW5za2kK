@@ -46,9 +46,19 @@ func main() {
 		}
 
 		rdb := redis.NewClient(opts)
+		defer func() {
+			err := rdb.Close()
+			if err != nil {
+				log.Fatalf("closing redis connection failed: %s", err)
+			}
+		}()
 
 		log.Println("redis ping...")
 		pong, err := rdb.Ping(context.Background()).Result()
+		if err != nil {
+			log.Fatalf("redis not responsive: %s", err)
+		}
+
 		log.Println(pong, err)
 
 		storage = redis_db.NewStore(rdb)
