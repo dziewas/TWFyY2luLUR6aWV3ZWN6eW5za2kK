@@ -75,7 +75,7 @@ func (f *Fetcher) retriever(finish chan bool, ticker *time.Ticker, assignments c
 		case <-ticker.C:
 			tasks := f.getTasks(ctx)
 			log.Printf("tasks in this interval: %d\n", len(tasks))
-			for i, _ := range tasks {
+			for i := range tasks {
 				assignments <- &assignment{task: tasks[i], result: nil}
 			}
 		case <-finish:
