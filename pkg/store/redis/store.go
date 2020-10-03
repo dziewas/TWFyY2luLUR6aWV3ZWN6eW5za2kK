@@ -2,9 +2,8 @@ package redis
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/go-redis/redis/v8"
 
@@ -15,6 +14,7 @@ import (
 const (
 	taskPrefix     = "task:"
 	responsePrefix = "response:"
+	idKey          = "id"
 	urlKey         = "url"
 	intervalKey    = "interval"
 	bodyKey        = "body"
@@ -24,11 +24,11 @@ const (
 	removeAll = 0
 	lastElem  = -1
 
-	historyLimit = 100
+	historyLimit = 10
 )
 
 var (
-	taskKeys     = []string{urlKey, intervalKey, createdAtKey}
+	taskKeys     = []string{idKey, urlKey, intervalKey}
 	responseKeys = []string{bodyKey, durationKey, createdAtKey}
 )
 
@@ -46,14 +46,15 @@ func (s *Store) Create(ctx context.Context, t *model.Task) (int, error) {
 	tasks := taskPrefix
 	task := taskPrefix + strconv.Itoa(id)
 
-	_, err := s.client.HSet(ctx, task, urlKey, t.Url, intervalKey, t.Interval).Result()
-	if err != nil {
-		return id, util.Wrap(err, "task create failed")
-	}
+	cmds, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.HSet(ctx, task, idKey, id, urlKey, t.Url, intervalKey, t.Interval)
+		pipe.LPush(ctx, tasks, task)
 
-	_, err = s.client.LPush(ctx, tasks, task).Result()
-	if err != nil {
-		return id, util.Wrap(err, "adding task to the list failed")
+		return nil
+	})
+
+	if err != nil || len(cmds) != 2 {
+		return id, util.Wrap(err, "saving task to DB failed")
 	}
 
 	return id, nil
@@ -87,19 +88,15 @@ func (s *Store) Delete(ctx context.Context, id int) error {
 	tasks := taskPrefix
 	task := taskPrefix + strconv.Itoa(id)
 
-	n, err := s.client.LRem(ctx, tasks, removeAll, task).Result()
-	if err != nil {
-		return util.Wrap(err, "task removal from list failed")
-	}
+	results, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.LRem(ctx, tasks, removeAll, task)
+		pipe.HDel(ctx, task, taskKeys...)
 
-	if n != 1 {
-		log.Printf("unexpected number of tasks removed from list %d\n", n)
 		return nil
-	}
+	})
 
-	_, err = s.client.HDel(ctx, task, taskKeys...).Result()
-	if err != nil {
-		return util.Wrap(err, "task removal failed")
+	if err != nil || len(results) != 2 {
+		return util.Wrap(err, "deleting task from DB failed")
 	}
 
 	return nil
@@ -111,47 +108,50 @@ func (s *Store) ListTasks(ctx context.Context) ([]*model.Task, error) {
 		return nil, util.Wrap(err, "getting list of tasks failed")
 	}
 
-	results := make([]*model.Task, 0, len(tasks))
-
-	for _, task := range tasks {
-		id, err := strconv.Atoi(strings.Split(task, ":")[1])
-		if err != nil {
-			return nil, util.Wrap(err, "task with invalid id on the list")
+	results, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		for _, task := range tasks {
+			pipe.HGetAll(ctx, task)
 		}
 
-		properties, err := s.client.HGetAll(ctx, task).Result()
-		if err != nil {
-			return nil, util.Wrap(err, "fetching task failed")
+		return nil
+	})
+
+	if err != nil || len(results) != len(tasks) {
+		return nil, util.Wrap(err, "getting some tasks from DB failed")
+	}
+
+	ret := make([]*model.Task, 0, len(tasks))
+
+	for _, result := range results {
+		properties, ok := result.(*redis.StringStringMapCmd)
+		if !ok {
+			return nil, util.Wrap(err, "fetching task properties failed")
 		}
 
-		if len(properties) == 0 {
-			log.Printf("unexpected empty task %s", task)
-			return nil, nil
-		}
-
-		interval, err := strconv.Atoi(properties[intervalKey])
+		id, err := strconv.Atoi(properties.Val()[idKey])
 		if err != nil {
 			return nil, util.Wrap(err, "interval conversion failed")
 		}
 
-		results = append(results, &model.Task{
+		interval, err := strconv.Atoi(properties.Val()[intervalKey])
+		if err != nil {
+			return nil, util.Wrap(err, "interval conversion failed")
+		}
+
+		ret = append(ret, &model.Task{
 			Id:       id,
-			Url:      properties[urlKey],
+			Url:      properties.Val()[urlKey],
 			Interval: interval,
 		})
 	}
 
-	return results, nil
+	return ret, nil
 }
 
 func (s *Store) taskExists(ctx context.Context, id int) bool {
 	task := taskPrefix + strconv.Itoa(id)
-	found, err := s.client.HExists(ctx, task, urlKey).Result()
-	if err != nil {
-		return false
-	}
 
-	return found
+	return s.client.HExists(ctx, task, urlKey).Val()
 }
 
 func (s *Store) AddAttempt(ctx context.Context, id int, a *model.Attempt) error {
@@ -159,33 +159,52 @@ func (s *Store) AddAttempt(ctx context.Context, id int, a *model.Attempt) error 
 		return util.ErrResourceNotFound
 	}
 
-	response := responsePrefix + strconv.FormatInt(a.CreatedAt, 10)
-	_, err := s.client.HSet(ctx, response, bodyKey, a.Response, durationKey, a.Duration, createdAtKey, a.CreatedAt).Result()
+	err := s.historyCleanup(ctx, id)
 	if err != nil {
-		return util.Wrap(err, "response create failed")
+		return util.Wrap(err, "history cleanup failed")
 	}
 
-	taskResponses := responsePrefix + strconv.Itoa(id)
-	_, err = s.client.LPush(ctx, taskResponses, response).Result()
-	if err != nil {
-		return util.Wrap(err, "adding response to the list failed")
+	response := fmt.Sprintf("%s%d:%d", responsePrefix, id, a.CreatedAt)
+	responses := responsePrefix + strconv.Itoa(id)
+
+	results, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.HSet(ctx, response, bodyKey, a.Response, durationKey, a.Duration, createdAtKey, a.CreatedAt)
+		pipe.RPush(ctx, responses, response)
+
+		return nil
+	})
+
+	if err != nil || len(results) != 2 {
+		return util.Wrap(err, "saving response to DB failed")
 	}
 
-	oldResponses, err := s.client.LRange(ctx, taskResponses, historyLimit, lastElem).Result()
+	return nil
+}
+
+func (s *Store) historyCleanup(ctx context.Context, id int) error {
+	responses := responsePrefix + strconv.Itoa(id)
+
+	historySize := s.client.LLen(ctx, responses).Val()
+	if historySize <= historyLimit {
+		return nil
+	}
+
+	oldResponses, err := s.client.LRange(ctx, responses, 0, historySize-historyLimit-1).Result()
 	if err != nil {
 		return util.Wrap(err, "getting list of task old responses failed")
 	}
 
-	for _, resp := range oldResponses {
-		_, err := s.client.HDel(ctx, resp, responseKeys...).Result()
-		if err != nil {
-			return util.Wrap(err, "old response removal failed")
+	results, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.LTrim(ctx, responses, historySize-historyLimit, lastElem)
+		for _, resp := range oldResponses {
+			pipe.HDel(ctx, resp, responseKeys...)
 		}
-	}
 
-	_, err = s.client.LTrim(ctx, taskResponses, 0, historyLimit-1).Result()
-	if err != nil {
-		return util.Wrap(err, "response removal from list failed")
+		return nil
+	})
+
+	if err != nil || len(results) != len(oldResponses)+1 {
+		return util.Wrap(err, "removing old responses from DB failed")
 	}
 
 	return nil
@@ -202,35 +221,42 @@ func (s *Store) ListAttempts(ctx context.Context, id int) ([]*model.Attempt, err
 		return nil, util.Wrap(err, "getting list of task responses failed")
 	}
 
-	results := make([]*model.Attempt, 0, len(responses))
-
-	for _, response := range responses {
-		properties, err := s.client.HGetAll(ctx, response).Result()
-		if err != nil {
-			return nil, util.Wrap(err, "fetching response failed")
+	results, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		for _, response := range responses {
+			pipe.HGetAll(ctx, response)
 		}
 
-		if len(properties) == 0 {
-			log.Printf("unexpected empty response for %s from task %s", response, taskResponses)
-			continue
+		return nil
+	})
+
+	if err != nil || len(results) != len(responses) {
+		return nil, util.Wrap(err, "getting some responses from DB failed")
+	}
+
+	ret := make([]*model.Attempt, 0, len(responses))
+
+	for _, result := range results {
+		properties, ok := result.(*redis.StringStringMapCmd)
+		if !ok {
+			return nil, util.Wrap(err, "fetching response properties failed")
 		}
 
-		createdAt, err := strconv.ParseInt(properties[createdAtKey], 10, 64)
+		createdAt, err := strconv.ParseInt(properties.Val()[createdAtKey], 10, 64)
 		if err != nil {
 			return nil, util.Wrap(err, "timestamp conversion failed")
 		}
 
-		duration, err := strconv.ParseFloat(properties[durationKey], 64)
+		duration, err := strconv.ParseFloat(properties.Val()[durationKey], 64)
 		if err != nil {
 			return nil, util.Wrap(err, "duration conversion failed")
 		}
 
-		results = append(results, &model.Attempt{
-			Response:  properties[bodyKey],
+		ret = append(ret, &model.Attempt{
+			Response:  properties.Val()[bodyKey],
 			CreatedAt: createdAt,
 			Duration:  duration,
 		})
 	}
 
-	return results, nil
+	return ret, nil
 }
