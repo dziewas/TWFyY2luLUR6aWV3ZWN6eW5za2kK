@@ -1,10 +1,10 @@
 package main
 
 import (
-	"flag"
 	"log"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 )
@@ -14,13 +14,14 @@ const (
 	sizeLimit    = 1024 * 1024
 	sizeParam    = "size"
 	rangePath    = "/range/{" + sizeParam + "}"
+	portEnvVar   = "PORT"
 )
 
 func main() {
-	var port string
-
-	flag.StringVar(&port, "port", "8080", "http port to listen on")
-	flag.Parse()
+	port := os.Getenv(portEnvVar)
+	if port == "" {
+		log.Fatalf("%s variable not set\n", portEnvVar)
+	}
 
 	r := mux.NewRouter()
 

@@ -1,0 +1,30 @@
+version: '3'
+
+services:
+
+  # rest api service
+  crawler:
+    build:
+      context: .
+      dockerfile: cmd/service/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      REDIS_URL: redis://redis:6379
+      PORT: 8080
+    depends_on:
+      - responder
+      - redis
+
+  # simple http responder (for testing in offline mode)
+  responder:
+    build:
+      context: .
+      dockerfile: cmd/test/responder/Dockerfile
+    environment:
+      PORT: 8080
+
+  # redis DB
+  redis:
+    image: redis:alpine
+
