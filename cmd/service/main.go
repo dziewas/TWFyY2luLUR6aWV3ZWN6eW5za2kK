@@ -18,16 +18,19 @@ import (
 )
 
 const (
-	defaultLimit = 1024 * 1024
+	defaultLimit = 1024 * 256
 	redisEnvVar  = "REDIS_URL"
+	portEnvVar   = "PORT"
 )
 
 func main() {
-	var ip, port string
+	port := os.Getenv(portEnvVar)
+	if port == "" {
+		log.Fatalf("%s variable not set\n", portEnvVar)
+	}
+
 	var limit int
 
-	flag.StringVar(&port, "port", "8080", "http port to listen on")
-	flag.StringVar(&ip, "ip", "0.0.0.0", "ip address to bind to")
 	flag.IntVar(&limit, "limit", defaultLimit, "payload limit")
 	flag.Parse()
 
@@ -70,7 +73,7 @@ func main() {
 
 	sizeLimiter := handler.NewSizeLimiter(limit)
 
-	addr := net.JoinHostPort(ip, port)
+	addr := net.JoinHostPort("", port)
 	log.Printf("listening on: %s\n", addr)
 
 	err := http.ListenAndServe(addr, handler.NewChain(router, sizeLimiter))
