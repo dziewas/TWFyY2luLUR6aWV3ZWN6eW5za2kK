@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/gorilla/mux"
 
 	"crawler/pkg/handler"
 	"crawler/pkg/store"
@@ -67,11 +66,7 @@ func main() {
 	fetcherStop := fetcher.Start()
 	defer fetcherStop()
 
-	router := mux.NewRouter()
-	router.Handle("/api/fetcher", http.HandlerFunc(fetcher.Create)).Methods("POST")
-	router.Handle("/api/fetcher", http.HandlerFunc(fetcher.List)).Methods("GET")
-	router.Handle("/api/fetcher/{id}", http.HandlerFunc(fetcher.Delete)).Methods("DELETE")
-	router.Handle("/api/fetcher/{id}/history", http.HandlerFunc(fetcher.History)).Methods("GET")
+	router := handler.NewRouter(fetcher)
 
 	sizeLimiter := handler.NewSizeLimiter(limit)
 
