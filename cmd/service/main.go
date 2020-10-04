@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 
@@ -26,7 +27,7 @@ const (
 func main() {
 	port := os.Getenv(portEnvVar)
 	if port == "" {
-		log.Fatalf("%s variable not set\n", portEnvVar)
+		log.Fatalf("%s variable not set", portEnvVar)
 	}
 
 	var limit int
@@ -38,29 +39,25 @@ func main() {
 
 	redisUrl := os.Getenv(redisEnvVar)
 	if len(redisUrl) == 0 {
-		log.Printf("'%s' env var not set, using in-mem Store\n", redisEnvVar)
+		log.Printf("'%s' env var not set, using in-mem Store", redisEnvVar)
 		storage = memory.NewMemory()
 	} else {
 		opts, err := redis.ParseURL(redisUrl)
 		if err != nil {
-			log.Fatalf("parsing redis url failed: %s\n", err)
+			log.Fatalf("parsing redis url failed: %s", err)
 		}
 
 		rdb := redis.NewClient(opts)
-		defer func() {
-			err := rdb.Close()
-			if err != nil {
-				log.Fatalf("closing redis connection failed: %s", err)
-			}
-		}()
 
-		log.Println("redis ping...")
-		pong, err := rdb.Ping(context.Background()).Result()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		err = util.RedisConnect(ctx, rdb)
 		if err != nil {
-			log.Fatalf("redis not responsive: %s", err)
+			log.Fatalf("timeout waiting for redis: %s", err)
 		}
 
-		log.Println(pong, err)
+		defer util.MustClose(rdb)
 
 		storage = redis_db.NewStore(rdb)
 	}
@@ -74,10 +71,10 @@ func main() {
 	sizeLimiter := handler.NewSizeLimiter(limit)
 
 	addr := net.JoinHostPort("", port)
-	log.Printf("listening on: %s\n", addr)
+	log.Printf("listening on: %s", addr)
 
 	err := http.ListenAndServe(addr, handler.NewChain(router, sizeLimiter))
 	if err != nil {
-		log.Fatalf("starting server failed: %s\n", err)
+		log.Fatalf("starting server failed: %s", err)
 	}
 }

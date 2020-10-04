@@ -28,3 +28,18 @@ services:
   redis:
     image: redis:alpine
 
+
+
+
+  # integration tests
+  integration_test:
+    build:
+      context: .
+      dockerfile: pkg/test/Dockerfile
+    environment:
+      CGO_ENABLED: 0
+    depends_on:
+      - crawler
+      - responder
+      - redis
+
