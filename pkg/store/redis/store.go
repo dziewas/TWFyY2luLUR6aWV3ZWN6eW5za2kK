@@ -24,7 +24,7 @@ const (
 	removeAll = 0
 	lastElem  = -1
 
-	historyLimit = 10
+	historyLimit = 100
 )
 
 var (

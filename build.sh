@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # tidy up
-go test -v ./... &&
+go test -v ./... --tags=unit &&
   go build -v ./... &&
   go fmt ./... &&
   go mod tidy && goimports -w -local crawler cmd pkg &&
