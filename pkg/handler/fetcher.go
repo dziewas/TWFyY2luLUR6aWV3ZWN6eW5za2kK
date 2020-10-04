@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -20,6 +21,7 @@ const (
 	defaultTickerInterval = time.Second * 1
 	defaultTimeout        = time.Second * 5
 	defaultWorkers        = 10
+	maxId                 = math.MaxInt16
 )
 
 type assignment struct {
@@ -29,10 +31,11 @@ type assignment struct {
 
 type Fetcher struct {
 	storage store.Store
+	idGen   func(int64) int64
 }
 
-func NewFetcher(storage store.Store) *Fetcher {
-	return &Fetcher{storage: storage}
+func NewFetcher(storage store.Store, idGen func(int64) int64) *Fetcher {
+	return &Fetcher{storage: storage, idGen: idGen}
 }
 
 func (f *Fetcher) getTasks(ctx context.Context) []*model.Task {
@@ -180,13 +183,14 @@ func (f *Fetcher) Create(w http.ResponseWriter, r *http.Request) {
 
 	defer util.MustClose(r.Body)
 
-	id, err := f.storage.Create(r.Context(), &task)
+	task.Id = int(f.idGen(maxId))
+	err = f.storage.Create(r.Context(), &task)
 	if err != nil {
 		util.EmitHttpError(w, err)
 		return
 	}
 
-	w.Header().Add("Location", strconv.Itoa(id))
+	w.Header().Add("Location", strconv.Itoa(task.Id))
 }
 
 func (f *Fetcher) Delete(w http.ResponseWriter, r *http.Request) {

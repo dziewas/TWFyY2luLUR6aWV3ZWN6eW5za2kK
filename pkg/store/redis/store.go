@@ -40,24 +40,22 @@ func NewStore(client *redis.Client) *Store {
 	return &Store{client: client}
 }
 
-func (s *Store) Create(ctx context.Context, t *model.Task) (int, error) {
-	id := util.NewID()
-
+func (s *Store) Create(ctx context.Context, t *model.Task) error {
 	tasks := taskPrefix
-	task := taskPrefix + strconv.Itoa(id)
+	task := taskPrefix + strconv.Itoa(t.Id)
 
 	cmds, err := s.client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		pipe.HSet(ctx, task, idKey, id, urlKey, t.Url, intervalKey, t.Interval)
+		pipe.HSet(ctx, task, idKey, t.Id, urlKey, t.Url, intervalKey, t.Interval)
 		pipe.LPush(ctx, tasks, task)
 
 		return nil
 	})
 
 	if err != nil || len(cmds) != 2 {
-		return id, util.Wrap(err, "saving task to DB failed")
+		return util.Wrap(err, "saving task to DB failed")
 	}
 
-	return id, nil
+	return nil
 }
 
 func (s *Store) Get(ctx context.Context, id int) (*model.Task, error) {

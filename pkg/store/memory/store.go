@@ -32,19 +32,17 @@ func NewMemory() *Memory {
 	}
 }
 
-func (m *Memory) Create(ctx context.Context, t *model.Task) (int, error) {
+func (m *Memory) Create(ctx context.Context, t *model.Task) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	id := util.NewID()
-
-	m.tasks[id] = &task{
-		Id:       id,
+	m.tasks[t.Id] = &task{
+		Id:       t.Id,
 		Url:      t.Url,
 		Interval: t.Interval,
 	}
 
-	return id, nil
+	return nil
 }
 
 func (m *Memory) Get(ctx context.Context, id int) (*model.Task, error) {

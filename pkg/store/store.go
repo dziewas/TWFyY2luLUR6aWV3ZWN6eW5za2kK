@@ -7,7 +7,7 @@ import (
 )
 
 type Store interface {
-	Create(ctx context.Context, task *model.Task) (int, error)
+	Create(ctx context.Context, task *model.Task) error
 	Get(ctx context.Context, id int) (*model.Task, error)
 	Delete(ctx context.Context, id int) error
 	ListTasks(ctx context.Context) ([]*model.Task, error)
