@@ -9,14 +9,13 @@ import (
 	"os"
 
 	"github.com/go-redis/redis/v8"
-
-	"crawler/pkg/store"
-
 	"github.com/gorilla/mux"
 
 	"crawler/pkg/handler"
+	"crawler/pkg/store"
 	"crawler/pkg/store/memory"
 	redis_db "crawler/pkg/store/redis"
+	"crawler/pkg/util"
 )
 
 const (
@@ -64,7 +63,7 @@ func main() {
 		storage = redis_db.NewStore(rdb)
 	}
 
-	fetcher := handler.NewFetcher(storage)
+	fetcher := handler.NewFetcher(storage, util.GenID)
 	fetcherStop := fetcher.Start()
 	defer fetcherStop()
 

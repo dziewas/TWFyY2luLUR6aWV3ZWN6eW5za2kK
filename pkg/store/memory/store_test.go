@@ -5,6 +5,7 @@ package memory
 import (
 	"context"
 	"errors"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,11 +15,11 @@ import (
 	"crawler/pkg/util"
 )
 
-func create(t *testing.T, ctx context.Context, store *Memory, task *model.Task) int {
-	id, err := store.Create(ctx, task)
-	require.NoError(t, err)
+const maxId = math.MaxInt16
 
-	return id
+func create(t *testing.T, ctx context.Context, store *Memory, task *model.Task) {
+	err := store.Create(ctx, task)
+	require.NoError(t, err)
 }
 
 func TestCreate(t *testing.T) {
@@ -26,30 +27,27 @@ func TestCreate(t *testing.T) {
 
 	ctx := context.Background()
 
-	id1 := create(t, ctx, store, &model.Task{})
-	id2 := create(t, ctx, store, &model.Task{})
-
-	assert.NotEqual(t, id1, id2)
+	create(t, ctx, store, &model.Task{Id: int(util.GenID(maxId))})
+	create(t, ctx, store, &model.Task{Id: int(util.GenID(maxId))})
 }
 
 func TestGetExisting(t *testing.T) {
 	store := NewMemory()
 
 	newTask := &model.Task{
+		Id:       int(util.GenID(maxId)),
 		Url:      "http://example.com",
 		Interval: 60,
 	}
 
 	ctx := context.Background()
 
-	id := create(t, ctx, store, newTask)
-	newTask.Id = id
+	create(t, ctx, store, newTask)
 
-	readTask, err := store.Get(ctx, id)
+	readTask, err := store.Get(ctx, newTask.Id)
 	require.NoError(t, err)
 
 	assert.Equal(t, newTask, readTask)
-
 }
 
 func TestGetNonExisting(t *testing.T) {
@@ -66,11 +64,13 @@ func TestDeleteExisting(t *testing.T) {
 
 	ctx := context.Background()
 
-	id := create(t, ctx, store, &model.Task{})
-	err := store.Delete(ctx, id)
+	task := &model.Task{Id: int(util.GenID(maxId))}
+
+	create(t, ctx, store, task)
+	err := store.Delete(ctx, task.Id)
 	require.NoError(t, err)
 
-	_, err = store.Get(ctx, id)
+	_, err = store.Get(ctx, task.Id)
 	assert.True(t, errors.Is(err, util.ErrResourceNotFound))
 }
 
@@ -90,16 +90,18 @@ func TestListTasks(t *testing.T) {
 
 	newTasks := []*model.Task{
 		{
+			Id:       int(util.GenID(maxId)),
 			Url:      "http://example.com",
 			Interval: 60,
 		},
 		{
+			Id:       int(util.GenID(maxId)),
 			Url:      "http://dummy.com",
 			Interval: 10,
 		}}
 
-	newTasks[0].Id = create(t, ctx, store, newTasks[0])
-	newTasks[1].Id = create(t, ctx, store, newTasks[1])
+	create(t, ctx, store, newTasks[0])
+	create(t, ctx, store, newTasks[1])
 
 	readTasks, err := store.ListTasks(ctx)
 	require.NoError(t, err)
@@ -111,9 +113,10 @@ func TestAddAttempts(t *testing.T) {
 
 	ctx := context.Background()
 
-	id := create(t, ctx, store, &model.Task{})
+	task := &model.Task{Id: int(util.GenID(maxId))}
+	create(t, ctx, store, task)
 
-	err := store.AddAttempt(ctx, id, &model.Attempt{})
+	err := store.AddAttempt(ctx, task.Id, &model.Attempt{})
 	require.NoError(t, err)
 }
 
@@ -123,17 +126,19 @@ func TestGetAttempts(t *testing.T) {
 	ctx := context.Background()
 
 	task1 := &model.Task{
+		Id:       int(util.GenID(maxId)),
 		Url:      "http://example.com",
 		Interval: 60,
 	}
 
 	task2 := &model.Task{
+		Id:       int(util.GenID(maxId)),
 		Url:      "http://dummy.com",
 		Interval: 10,
 	}
 
-	task1.Id = create(t, ctx, store, task1)
-	task2.Id = create(t, ctx, store, task2)
+	create(t, ctx, store, task1)
+	create(t, ctx, store, task2)
 
 	attempt1 := &model.Attempt{
 		Response:  "response1",

@@ -9,17 +9,15 @@ import (
 	"time"
 )
 
-const maxID = 1000000
-
-func NewID() int {
+func GenID(maxID int64) int64 {
 	id, err := rand_strong.Int(rand_strong.Reader, big.NewInt(maxID))
 	if err != nil {
 		log.Printf("random generator failed, fallback to default generator")
 
-		return rand_weak.Intn(maxID)
+		return int64(rand_weak.Intn(int(maxID)))
 	}
 
-	return int(id.Int64())
+	return id.Int64()
 }
 
 func MustClose(c io.Closer) {
