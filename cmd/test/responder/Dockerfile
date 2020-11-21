@@ -1,7 +1,7 @@
 FROM golang:alpine AS builder
 WORKDIR /work/
 COPY . .
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o ./bin/responder ./cmd/test/responder/*.go
+RUN GOOS=linux GOARCH=amd64 go build -mod vendor -ldflags="-w -s" -o ./bin/responder ./cmd/test/responder/*.go
 
 
 FROM golang:alpine
