@@ -67,13 +67,13 @@ func main() {
 	defer fetcherStop()
 
 	router := handler.NewRouter(fetcher)
-
 	sizeLimiter := handler.NewSizeLimiter(limit)
+	contentType := handler.NewContentTypeMW()
 
 	addr := net.JoinHostPort("", port)
 	log.Printf("listening on: %s", addr)
 
-	err := http.ListenAndServe(addr, handler.NewChain(router, sizeLimiter))
+	err := http.ListenAndServe(addr, handler.NewChain(router, contentType, sizeLimiter))
 	if err != nil {
 		log.Fatalf("starting server failed: %s", err)
 	}
