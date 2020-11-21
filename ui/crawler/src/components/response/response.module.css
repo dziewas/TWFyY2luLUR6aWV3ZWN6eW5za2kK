@@ -1,0 +1,22 @@
+.response {
+    display: block;
+    padding: 5px;
+    font-size: 100%;
+    color: darkslategray;
+    /* text-align: justify;
+    text-justify: newspaper; */
+}
+
+.note {
+    max-width: 90%;
+    margin-top: 3%;
+    border: 1px ridge lightgray;
+    padding: 1%;
+    text-overflow: ellipsis;
+    word-wrap: break-word;
+    overflow: hidden;
+}
+
+.response {
+    color: darkslategray;
+}

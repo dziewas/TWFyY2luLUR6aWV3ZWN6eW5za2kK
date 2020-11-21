@@ -1,0 +1,19 @@
+.crawler {
+    vertical-align: top;
+}
+
+.left {
+    position: absolute;
+    width: 20%;
+    top: 5%;
+    left: 5%;
+    vertical-align: top;
+}
+
+.right {
+    position: absolute;
+    width: 30%;
+    top: 5%;
+    left: 30%;
+    vertical-align: top;
+}

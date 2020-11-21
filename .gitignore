@@ -16,6 +16,9 @@
 
 # IDE
 .idea
+.vscode
+.eslint*
 
 # bin directory
 bin
+node_modules
