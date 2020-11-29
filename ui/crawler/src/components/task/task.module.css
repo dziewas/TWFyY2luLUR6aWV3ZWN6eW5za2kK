@@ -1,0 +1,47 @@
+.linkButton {
+  background-color: transparent;
+  border: none;
+  margin-top: 5%;
+  color: darkslategray;
+}
+
+.linkButton:hover {
+  color: gray;
+  cursor: pointer;
+}
+
+.deleteButton {
+  background-color: transparent;
+  border: none;
+  margin-top: 5%;
+  color: darkred;
+  float: right;
+}
+
+.deleteButton:hover {
+  color: gray;
+  cursor: pointer;
+}
+
+input {
+  width: 100%;
+  padding: 12px 20px;
+  margin: 8px 0;
+  border: 1px solid green;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+input[type=submit] {
+  width: 100%;
+  background-color: darkgreen;
+  border: 0px;
+  color: white;
+  padding: 14px 20px;
+  margin: 8px 0;
+  border-radius: 4px;
+}
+
+input[type=submit]:hover {
+  background-color: green;
+}
