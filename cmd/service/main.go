@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/gorilla/mux"
 	"log"
 	"net"
 	"net/http"
@@ -67,13 +68,14 @@ func main() {
 	defer fetcherStop()
 
 	router := handler.NewRouter(fetcher)
+	cors := mux.CORSMethodMiddleware(router)
 	sizeLimiter := handler.NewSizeLimiter(limit)
 	contentType := handler.NewContentTypeMW()
 
 	addr := net.JoinHostPort("", port)
 	log.Printf("listening on: %s", addr)
 
-	err := http.ListenAndServe(addr, handler.NewChain(router, contentType, sizeLimiter))
+	err := http.ListenAndServe(addr, handler.NewChain(router, contentType, sizeLimiter, cors))
 	if err != nil {
 		log.Fatalf("starting server failed: %s", err)
 	}
